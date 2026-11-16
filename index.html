@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BronchoSim v1 — 기관지경 시뮬레이터</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">BronchoSim <span>v1</span></div>
+    <nav class="tabs">
+      <button id="tabExplore" class="tab active">기도 탐색</button>
+      <button id="tabDLT" class="tab">DLT 위치 확인</button>
+    </nav>
+    <div class="tools">
+      <button id="btnLabels" class="tog on">라벨</button>
+      <button id="btnMap" class="tog on">미니맵</button>
+      <button id="btnReset" class="tog">처음으로</button>
+      <button id="btnHelp" class="tog">조작법</button>
+    </div>
+  </header>
+  <main id="main">
+    <section id="viewWrap">
+      <div id="view">
+        <canvas id="gl"></canvas>
+        <div id="labels"></div>
+        <div id="mask"><div id="notch"></div></div>
+        <div id="contact">벽 접촉</div>
+        <div id="hud">
+          <div><b>위치</b> <span id="hudLoc">-</span></div>
+          <div><b>깊이(앞니 기준)</b> <span id="hudDepth">-</span></div>
+          <div id="hudExtra"></div>
+        </div>
+        <canvas id="minimap" width="200" height="250"></canvas>
+        <div id="loading">기도 모델 생성 중…</div>
+      </div>
+      <div id="pad">
+        <div class="grp">
+          <div class="cap">삽입</div>
+          <button class="hold big" data-act="adv">▲<small>전진</small></button>
+          <button class="hold big" data-act="ret">▼<small>후퇴</small></button>
+        </div>
+        <div class="grp">
+          <div class="cap">팁 굴곡</div>
+          <button class="hold" data-act="up">⤒<small>위로</small></button>
+          <button class="hold" data-act="down">⤓<small>아래로</small></button>
+        </div>
+        <div class="grp">
+          <div class="cap">회전(비틀기)</div>
+          <button class="hold" data-act="ccw">⟲<small>반시계</small></button>
+          <button class="hold" data-act="cw">⟳<small>시계</small></button>
+        </div>
+      </div>
+    </section>
+    <aside id="side">
+      <div id="panelExplore" class="panel">
+        <h2>기도 탐색</h2>
+        <p class="muted">기관에서 시작해 엽·분절 기관지까지 진입해 보세요. 화면 위쪽(녹색 표시)이 환자의 <b>전면(anterior)</b>, 기관 후벽은 연골이 없는 막성부입니다. 시점은 <b>환자 머리 쪽(마취과 시점)</b>이라 환자의 오른쪽이 화면 오른쪽에 보입니다.</p>
+        <div class="stat"><span>방문한 분절 기관지</span><b id="visitCount">0 / 0</b></div>
+        <div id="visitList" class="chips"></div>
+        <div class="muted small" id="tipBox">팁: 분지 입구를 화면 중앙에 두고 전진하세요. 벽에 닿으면 화면이 붉어집니다(red-out).</div>
+      </div>
+      <div id="panelDLT" class="panel hidden">
+        <h2>DLT 위치 확인 <span id="caseNo"></span></h2>
+        <div class="row"><label><input type="checkbox" id="optRight"> 우측 DLT 증례 포함</label></div>
+        <div id="caseInfo" class="caseinfo"></div>
+        <div class="lumen">
+          <button id="btnTrach" class="lbtn active">기관 내강(Tracheal lumen)</button>
+          <button id="btnBronch" class="lbtn">기관지 내강(Bronchial lumen)</button>
+        </div>
+        <h3>1. 진단</h3>
+        <div class="chips sel" id="dxChips">
+          <button data-v="ok">정위치</button>
+          <button data-v="shallow">너무 얕음 (커프가 carina 위로 탈출)</button>
+          <button data-v="deep">너무 깊음 (엽기관지 폐쇄 / 기관 개구부가 carina 근접)</button>
+          <button data-v="wrong">반대쪽 주기관지에 삽입</button>
+        </div>
+        <h3>2. 조치</h3>
+        <div class="chips sel" id="actChips">
+          <button data-v="keep">그대로 유지</button>
+          <button data-v="advance">커프 수축 후 전진</button>
+          <button data-v="withdraw">커프 수축 후 후퇴</button>
+          <button data-v="reposition">기관까지 후퇴 → 기관지경 유도 하 재삽입</button>
+        </div>
+        <div class="row" id="amtRow">거리:
+          <select id="amt"><option>0.5</option><option selected>1.0</option><option>1.5</option><option>2.0</option><option>2.5</option><option>3.0</option><option>3.5</option></select> cm
+        </div>
+        <div class="row"><button id="btnSubmit" class="primary">제출</button><button id="btnNext" class="secondary">다음 증례</button></div>
+        <div id="feedback" class="hidden"></div>
+        <div class="stat"><span>점수</span><b id="score">0 / 0</b></div>
+      </div>
+    </aside>
+  </main>
+  <div id="help" class="hidden">
+    <div class="box">
+      <h2>조작법</h2>
+      <table>
+        <tr><th></th><th>iPad (터치)</th><th>PC (키보드/마우스)</th></tr>
+        <tr><td>전진 / 후퇴</td><td>▲ / ▼ 버튼 길게 누르기</td><td>↑ / ↓ (Shift = 빠르게), 마우스 휠</td></tr>
+        <tr><td>팁 굴곡 위/아래</td><td>⤒ / ⤓ 버튼, 화면 위아래 드래그</td><td>W / S, 마우스 위아래 드래그</td></tr>
+        <tr><td>회전(비틀기)</td><td>⟲ / ⟳ 버튼, 화면 좌우 드래그</td><td>← / → (또는 A / D), 마우스 좌우 드래그</td></tr>
+        <tr><td>라벨 / 미니맵</td><td>상단 버튼</td><td>L / M</td></tr>
+      </table>
+      <p class="muted small">기관지경은 실제처럼 위/아래 굴곡만 가능하므로, 옆쪽 분지로 가려면 먼저 비틀어서(회전) 분지를 화면 위/아래로 가져온 뒤 굴곡하세요. 후퇴는 들어온 경로를 따라 되돌아갑니다. 모든 그래픽은 절차적으로 생성되었습니다(교육용 근사 모델).</p>
+      <button id="btnHelpClose" class="primary">닫기</button>
+    </div>
+  </div>
+</div>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
